@@ -1,0 +1,113 @@
+Q1: 
+
+    Assuming that the following JOS kernel code is correct, what type should variable x have, uintptr_t or physaddr_t?
+
+    	mystery_t x;
+    	char* value = return_a_pointer();
+    	*value = 10;
+    	x = (mystery_t) value;
+
+
+x是由value强制转换而来，value是virtual address，所以x也是virtual address，所以x应当是uintptr_t
+
+Q2:
+	What entries (rows) in the page directory have been filled in at this point? What addresses do they map and where do they point? In other words, fill out this table as much as possible: 
+
+
+Entry 	 Base Virtual Address 	Points to (logically):
+1023	 0xffc00000		Page table for top 4MB of phys memory
+1022	 0xff800000		Page table for [248Mb, 252Mb) of phys memory
+961-1021 0xf0400000-0xff400000	Page tables for [4Mb, 248Mb) of phys memory
+960	 0xf0000000(KERNBASE)	Page table for [0, 4Mb) of phys memory: kernel code & static data
+959	 0xefc00000(KSTACKTOP)	NULL	
+958	 0xef800000(ULIM)	Page table for Kernel Stack
+957	 0xef400000(UVPT)	Page table for page directory itself
+956	 0xef000000(UPAGES)	Page table for "Struct Page *pages" 
+			NULL
+2	 0x00800000		NULL(program Data & Heap later)
+1	 0x00400000		NULL
+0	 0x00000000		[see next question]
+
+
+Q3
+
+	(From Lecture 3) We have placed the kernel and user environment in the same address space. Why will user programs not be able to read or write the kernel's memory? What specific mechanisms protect the kernel memory?
+
+	PTE_U 位负责控制，该位置0来保护kernel的memory
+
+Q4
+	What is the maximum amount of physical memory that this operating system can support? Why?
+
+	pages 映射到虚拟地址 UPAGES--UVPT的4M的空间里，所以没办法大于这个值，
+	sizof(Struct Page) = 8 byte,
+	最多保存4M/8bit = 0.5M页
+	每一个Page对应4k， 所以极限是0.5M*4kb的物理地址， 即2G
+
+
+Q5
+	How much space overhead is there for managing memory, if we actually had the maximum amount of physical memory? How is this overhead broken down
+
+	overhead:
+		pages: 4M
+		page directory: 4K
+		page table: 1024 * 4K = 4M 但是由于未必每个directory entry都会确实的指向一个table，所以不会达到4M。回顾Q2中的表格，我们能看到目前不重复指向同一个地址的entry大约有67个，67*4k = 268K， 但是这是在内存没有被使用的情况下。实际情况应该不会小于这个数值。 
+	减少开销，把UPAGES内存范围变大为2个PTSIZE。这样支持的最大物理地址会增加的4G，增加1倍，相对的overhead之增加了4M，增加量不到原来的1倍
+
+Q6:
+
+Revisit the page table setup in kern/entry.S and kern/entrypgdir.c. Immediately after we turn on paging, EIP is still a low number (a little over 1MB). At what point do we transition to running at an EIP above KERNBASE? What makes it possible for us to continue executing at a low EIP between when we enable paging and when we begin running at an EIP above KERNBASE? Why is this transition necessary? 
+
+
+
+entry:
+	movw	$0x1234,0x472			# warm boot
+
+	# We haven't set up virtual memory yet, so we're running from
+	# the physical address the boot loader loaded the kernel at: 1MB
+	# (plus a few bytes).  However, the C code is linked to run at
+	# KERNBASE+1MB.  Hence, we set up a trivial page directory that
+	# translates virtual addresses [KERNBASE, KERNBASE+4MB) to
+	# physical addresses [0, 4MB).  This 4MB region will be suffice
+	# until we set up our real page table in mem_init in lab 2.
+
+	# Load the physical address of entry_pgdir into cr3.  entry_pgdir
+	# is defined in entrypgdir.c.
+	movl	$(RELOC(entry_pgdir)), %eax
+	movl	%eax, %cr3
+	# Turn on paging.
+	movl	%cr0, %eax
+	orl	$(CR0_PE|CR0_PG|CR0_WP), %eax
+	movl	%eax, %cr0
+
+	# Now paging is enabled, but we're still running at a low EIP
+	# (why is this okay?).  Jump up above KERNBASE before entering
+	# C code.
+	mov	$relocated, %eax
+	jmp	*%eax
+
+
+
+
+在这段代码中，首先，将entry_pgdir作为一个page directory的地址给了%cr3。在接下来turn on paging之后，将会首先使用entry_pgdir作为page directory，在entrypgdir.c中：
+
+pde_t entry_pgdir[NPDENTRIES] = {
+	// Map VA's [0, 4MB) to PA's [0, 4MB)
+	[0]
+		= ((uintptr_t)entry_pgtable - KERNBASE) + PTE_P,
+	// Map VA's [KERNBASE, KERNBASE+4MB) to PA's [0, 4MB)
+	[KERNBASE>>PDXSHIFT]
+		= ((uintptr_t)entry_pgtable - KERNBASE) + PTE_P + PTE_W
+};
+
+
+Map VA's [0, 4MB) to PA's [0, 4MB)
+Map VA's [KERNBASE, KERNBASE+4MB) to PA's [0, 4MB)
+说明将低地址的0到4M和高地址的KERNBASE到KERNBASE+4M都映射到了同一个物理地址。因此高地址和低地址都可以同样运行。 真正开始运行在高地址实在jmp *%eax之后。这种设计是必要的，首先是规定要求kernel地址在高地址，所以我们必须要map，其次是我们在打开paging的那一刻我们是在低地址的，所以我们为了仍然可以运行就要将低地址也映射到物理内存的低地址。
+
+
+
+
+
+
+
+
