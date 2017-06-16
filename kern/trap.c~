@@ -261,7 +261,7 @@ page_fault_handler(struct Trapframe *tf)
 	// LAB 3: Your code here.
 	//the low 2 bits of the CS register are already zero when kernel-mode faults
 	if ((tf->tf_cs & 3) == 0)
-		panic("kernel-mode page fault va %08x ip %08x\n", fault_va, tf->tf_eip);
+		panic("kernel-mode page faults va %08x ip %08x\n", fault_va, tf->tf_eip);
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
 
