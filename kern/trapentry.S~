@@ -4,7 +4,6 @@
 #include <inc/memlayout.h>
 #include <inc/trap.h>
 
-#include <kern/picirq.h>
 
 
 ###################################################################
@@ -87,11 +86,11 @@ TRAPHANDLER_NOEC(irq_error, IRQ_OFFSET + IRQ_ERROR)
 
 //stack:
 /*
-	tf_ss = 0x00000 | old SS
-	tf_esp = old ESP
-	tf_eflags = old EFLAGS
-	tf_cs = 0x00000 | old CS
-	tf_eip = old eip
+	0x00000 | old SS
+	old ESP
+	old EFLAGS
+	0x00000 | old CS
+	old eip
 	tf_err = $(0) or error_code(pushed by cpu)
 	tf_trapno = $(num)
 	tf_ds = ds

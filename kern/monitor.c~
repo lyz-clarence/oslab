@@ -84,7 +84,7 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 		
 	}	
 	while(ebp!=0);
-	//ebp = read_ebp();
+	ebp = read_ebp();
 	
 	return 0;
 }
