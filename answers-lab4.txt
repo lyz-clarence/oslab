@@ -1,0 +1,36 @@
+Question 1
+Compare kern/mpentry.S side by side with boot/boot.S. Bearing in mind that kern/mpentry.S is compiled and linked to run above KERNBASE just like everything else in the kernel, what is the purpose of macro MPBOOTPHYS? Why is it necessary in kern/mpentry.S but not in boot/boot.S? In other words, what could go wrong if it were omitted in kern/mpentry.S? 
+Hint: recall the differences between the link address and the load address that we have discussed in Lab 
+
+由于mpentry.S本身是进过重定向的，因此代码中的地址是高位地址，而我们将其拷贝进低地址，并用real mode来运行，也就是说我们应该使用的是拷贝进入的地址。所以我们要进行地址翻译，即将高位的地址变成的我们需要的地址。MPBOOTPHYS就是用于地址翻译的。
+
+Question2
+It seems that using the big kernel lock guarantees that only one CPU can run the kernel code at a time. Why do we still need separate kernel stacks for each CPU? Describe a scenario in which using a shared kernel stack will go wrong, even with the protection of the big kernel lock.
+
+在trap时cpu会自动push一些信息。而此时push的时候是没有拿到kernel lock的，如果多个cpu同时trap的话，如果都向一个共享的栈push的话，就会破坏栈应有的结构。所以需要每个CPU都有自己对应的kernel stack.
+
+Quesion3
+In your implementation of env_run() you should have called lcr3(). Before and after the call to lcr3(), your code makes references (at least it should) to the variable e, the argument to env_run. Upon loading the %cr3 register, the addressing context used by the MMU is instantly changed. But a virtual address (namely e) has meaning relative to a given address context--the address context specifies the physical address to which the virtual address maps. Why can the pointer e be dereferenced both before and after the addressing switch?
+
+在lcr3()之前使用的是kernel_pgdir,之后使用的是e->env_pgdir，两者在e这个virtual address附近的映射到物理地址上的方式相同的。在env_setup_vm中我们设置了在kernel部分，kernel_pgdir和env_pgdir相同。
+
+Quesiton4
+Whenever the kernel switches from one environment to another, it must ensure the old environment's registers are saved so they can be restored properly later. Why? Where does this happen?
+
+为了之后能在这个env上继续运行当然要保存寄存器。
+当switch时，首先是由一个env遇到了trap，然后cpu push寄存器入栈，作为参数组成了TrapFrame传给trap()函数，在trap()函数中，curenv->env_tf = *tf，就此这些信息保存在了curenv中。 下次再使用这个env时，就会使用env_pop_tf(&curenv->env_tf),取出这些数据并跳转到需要的位置。
+
+
+Challenge 
+实现共享memory的sfork，本身很简单。已经写在fork.c里了。 大体上就是只有USTACKTOP-PGSIZE到USTACKTOP是COW的，其余都是共享的。
+需要考虑的是global的thisenv怎么办，由于这个变量是父子进程共享的，那么我们就可以用 (&envs[ENVX(sys_getenvid())]) 来代替thisenv,
+所以第一种方案是在ipc.c，fork.c，pingpongs.c里#define thisenv (&envs[ENVX(sys_getenvid())])
+但是这样并不好。相当于直接扔掉了thisenv，而且还会频繁的系统调用。
+
+因此第二种方法。
+考虑thisenv目前只在fork得到子进程，以及父进程刚开始时被赋值，而thisenv的使用主要位于ipc_recv在sys_ipc_recv之后，而且之后关于thisenv的使用都在ipc_send之前，那么我们就这样做，在sys_ipc_recv这个系统调用之后将thisenv手动赋值成当前进程。就可以了。由于pingpongs的实现的结构保证了，不存在父子进程同时处于ipc_recv之后，ipc_send之前的情况，所以ipc_recv中的对thisenv的赋值是线程安全的。
+
+测试pingpongs请使用
+make run-pingpongs
+另外我也有一个sfork的forktree版本
+make run-forktree1
