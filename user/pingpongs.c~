@@ -2,7 +2,7 @@
 // Only need to start one of these -- splits into two with sfork.
 
 #include <inc/lib.h>
-
+#define thisenv (&envs[ENVX(sys_getenvid())])
 uint32_t val;
 
 void

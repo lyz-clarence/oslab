@@ -67,7 +67,7 @@ _pgfault_upcall:
 	// LAB 4: Your code here.
 	movl 0x28(%esp), %eax		
 								//put trap-time eip into eax
-	subl $0x4, 0x30(%esp)		
+	subl 0x4, 0x30(%esp)		
 								//trap-time_esp - 4, in order to get a space for us to push trap-time eip into it
 	movl 0x30(%esp), %ebx		
 								//get the address of trap-time_esp-4

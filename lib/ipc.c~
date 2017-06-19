@@ -26,9 +26,7 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 	//panic("ipc_recv not implemented");
 	if (pg==NULL) pg = (void *)-1;
 	int r = sys_ipc_recv(pg);
-	
-	thisenv = (&envs[ENVX(sys_getenvid())]);	//for sfork
-	
+	thisenv = (&envs[ENVX(sys_getenvid())]);
 	if (r==0) {
 		if (from_env_store!=NULL)
 			*from_env_store = thisenv->env_ipc_from;

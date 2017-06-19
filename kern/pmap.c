@@ -212,10 +212,10 @@ mem_init(void)
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
 	boot_map_region(kern_pgdir, KERNBASE, ROUNDUP(~KERNBASE+1,PGSIZE), 0, PTE_W);
-	
+
 	// Initialize the SMP-related parts of the memory map
 	mem_init_mp();
-
+	
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
 
@@ -269,6 +269,13 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
+	uintptr_t kstacktop_i;
+	int i=0;
+	while (i<NCPU) {
+		kstacktop_i = KSTACKTOP - i * (KSTKSIZE + KSTKGAP);
+		boot_map_region(kern_pgdir, kstacktop_i - KSTKSIZE, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W);
+		i++;
+	}
 
 }
 
@@ -321,7 +328,10 @@ page_init(void)
 	struct Page* pg_in_free_start = pa2page(PADDR(boot_alloc(0)));
 	pg_in_free_start->pp_link = pg_in_use_start-1;
 	//[IOPHYSMEM, EXTPHYSMEM) U [EXTPHYSMEM, end) U [end, pages 's end) are in use
-	// 0xa0000      0x100000                             
+	// 0xa0000      0x100000      
+	struct Page* mpentry_in_use_start = pa2page(MPENTRY_PADDR);
+	
+	(mpentry_in_use_start+1)->pp_link = mpentry_in_use_start->pp_link;                       
 }
 
 //
@@ -431,17 +441,28 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
+
 	physaddr_t cur_ppage = ROUNDDOWN(pa, PGSIZE);		//physical address lower bound
 	physaddr_t last_ppage = (ROUNDUP(pa + size, PGSIZE) - PGSIZE); // last physical page = physical address upper bound - PGSIZE
+
 	pte_t *page_table_entry;
+
 	while (cur_ppage <= last_ppage) {
+	/*
+		We have a bug here
+		if last_ppage==0xfffff000
+		when cur_ppage=0xfffff000,
+		next time cur_ppage=0, cur_ppage is still smaller than last_ppage. BOMB!
+	*/
+	
 		page_table_entry = pgdir_walk(pgdir, (void *)va, 1);
 		va += PGSIZE;
 		*page_table_entry = cur_ppage | perm | PTE_P;
 		cur_ppage += PGSIZE; 
 		
+		if (cur_ppage==0) break; //important!
+		
 	}
-	
 	// Fill this function in
 }
 

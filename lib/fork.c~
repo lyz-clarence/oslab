@@ -147,7 +147,7 @@ fork(void)
 }
 
 // Challenge!
-
+#define thisenv (&envs[ENVX(sys_getenvid())])
 int
 sfork(void)
 {
@@ -159,7 +159,7 @@ sfork(void)
 	if (envid<0)
 		panic("fork: sys_exofork failed.");
 	if (envid==0) {
-		thisenv = &envs[ENVX(sys_getenvid())];
+		//thisenv = &envs[ENVX(sys_getenvid())];
 		return envid;
 	}
 	uintptr_t addr;

@@ -55,7 +55,7 @@ label1:
 		}
 		cur = (cur+1)%NENV;
 	}
-	if ((envs[cur].env_status == ENV_RUNNABLE)&&(envs[cur].env_type != ENV_TYPE_IDLE)) env_run(&envs[cur]);
+	if ((envs[cur].env_status == ENV_RUNNING)&&(envs[cur].env_type != ENV_TYPE_IDLE)) env_run(&envs[cur]);
 	
 	
 	
